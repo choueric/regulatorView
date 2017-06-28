@@ -31,17 +31,22 @@ func readRegulator(d string, r *regulator) error {
 		fpath := filepath.Join(d, fname)
 		switch fname {
 		case "name":
-			r.name, err = getName(fpath)
+			r.name, err = getString(fpath)
 			if err != nil {
 				return err
 			}
 		case "num_users":
-			r.userNum, err = getUserNum(fpath)
+			r.userNum, err = getInt(fpath)
 			if err != nil {
 				return err
 			}
 			if r.userNum > 0 {
 				getConsumers(r, files)
+			}
+		case "uevent":
+			r.uevent, err = getString(fpath)
+			if err != nil {
+				return err
 			}
 		case "parent":
 			fmt.Println("--------")

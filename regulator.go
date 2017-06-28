@@ -10,10 +10,11 @@ type regulator struct {
 	name      string
 	index     int
 	userNum   int
+	uevent    string
 	consumers []string
 }
 
-func getName(fname string) (string, error) {
+func getString(fname string) (string, error) {
 	s, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return "", err
@@ -21,7 +22,7 @@ func getName(fname string) (string, error) {
 	return string(s[0 : len(s)-1]), nil
 }
 
-func getUserNum(fname string) (int, error) {
+func getInt(fname string) (int, error) {
 	ret, err := ioutil.ReadFile(fname)
 	if err != nil {
 		return 0, err
