@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -31,7 +32,7 @@ func readRegulator(d string, r *regulator) error {
 		fpath := filepath.Join(d, fname)
 		switch fname {
 		case "name":
-			r.name, err = getString(fpath)
+			r.name, err = getLine(fpath)
 			if err != nil {
 				return err
 			}
@@ -90,15 +91,25 @@ func parsetRegulators(d string) bool {
 }
 
 func main() {
-	parsetRegulators(REGULATOR_DIR)
+	if err := initUi(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	if !parsetRegulators(REGULATOR_DIR) {
+		fmt.Println("read regulators failed")
+		os.Exit(2)
+	}
 	sort.Sort(ByIndex(regulators))
 
-	for _, r := range regulators {
-		fmt.Printf("[%3d]: %s, %d\n", r.index, r.name, r.userNum)
-		if r.userNum > 0 {
-			for _, c := range r.consumers {
-				fmt.Println("      ", c)
-			}
+	for {
+		input, err := ui.Ask("\n>>>")
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		if handleInput(input) {
+			break
 		}
 	}
 }
