@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
-	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const REGULATOR_DIR = "/sys/class/regulator"
@@ -19,37 +20,25 @@ func (a ByIndex) Len() int           { return len(a) }
 func (a ByIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByIndex) Less(i, j int) bool { return a[i].index < a[j].index }
 
-func readRegulator(d string) (*regulator, error) {
-	os.Chdir(d)
-	defer os.Chdir(REGULATOR_DIR)
-
-	s, _ := os.Getwd()
-	fmt.Println(d, ":", s)
-
-	idx, err := strconv.Atoi(strings.Split(d, ".")[1])
+func readRegulator(d string, r *regulator) error {
+	files, err := ioutil.ReadDir(d)
 	if err != nil {
-		return nil, err
-	}
-	r := &regulator{
-		index: idx,
-	}
-	files, err := ioutil.ReadDir(".")
-	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, file := range files {
 		fname := file.Name()
+		fpath := filepath.Join(d, fname)
 		switch fname {
 		case "name":
-			r.name, err = getName(fname)
+			r.name, err = getName(fpath)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		case "num_users":
-			r.userNum, err = getUserNum(fname)
+			r.userNum, err = getUserNum(fpath)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			if r.userNum > 0 {
 				getConsumers(r, files)
@@ -59,36 +48,44 @@ func readRegulator(d string) (*regulator, error) {
 		}
 	}
 
-	return r, nil
+	return nil
 }
 
-func parsetRegulators() bool {
-	files, err := ioutil.ReadDir(".")
+func parsetRegulators(d string) bool {
+	files, err := ioutil.ReadDir(d)
 	if err != nil {
 		fmt.Println(err)
 		return false
 	}
 
+	var wait sync.WaitGroup
 	for _, file := range files {
-		if !file.IsDir() {
-			r, err := readRegulator(file.Name())
-			if err != nil {
-				fmt.Println(file.Name(), err)
-				continue
-			}
-			regulators = append(regulators, r)
+		fname := file.Name()
+		idx, err := strconv.Atoi(strings.Split(fname, ".")[1])
+		if err != nil {
+			fmt.Println(fname, err)
+			continue
 		}
+		r := &regulator{index: idx}
+		regulators = append(regulators, r)
+		sub := filepath.Join(d, fname)
+		wait.Add(1)
+		go func(d string, r *regulator) {
+			defer wait.Done()
+			err := readRegulator(d, r)
+			if err != nil {
+				fmt.Println(d, err)
+			}
+		}(sub, r)
 	}
+
+	wait.Wait()
 
 	return true
 }
 
 func main() {
-	fmt.Println("== regulator tree ==")
-	os.Chdir(REGULATOR_DIR)
-
-	parsetRegulators()
-
+	parsetRegulators(REGULATOR_DIR)
 	sort.Sort(ByIndex(regulators))
 
 	for _, r := range regulators {
